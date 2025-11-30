@@ -1,0 +1,63 @@
+# Dockerfile con soporte GPU NVIDIA para análisis de emociones
+# Requiere nvidia-docker2 instalado en el host
+
+FROM nvidia/cuda:12.2-cudnn9-runtime-ubuntu22.04
+
+# Evitar prompts interactivos
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Variables CUDA
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Instalar Python y dependencias del sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    build-essential \
+    cmake \
+    git \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libboost-all-dev \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python
+
+# Copiar requirements
+COPY requirements.docker.txt requirements.txt
+
+# Instalar dependencias de Python
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copiar el código del proyecto
+COPY . .
+
+# Descargar modelo YOLO
+RUN python -c "from ultralytics import YOLO; YOLO('yolov8n-pose.pt')" || true
+
+# Crear directorio para base de datos
+RUN mkdir -p /app/data
+
+# Puerto para Daphne/Django
+EXPOSE 8000
+
+# Variables de entorno
+ENV TF_CPP_MIN_LOG_LEVEL=2
+ENV TF_FORCE_GPU_ALLOW_GROWTH=true
+ENV DJANGO_SETTINGS_MODULE=config.settings
+
+# Comando por defecto
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]

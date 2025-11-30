@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # Servicio principal - API con WebSocket
+  emotion-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: emotion-analysis-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./data:/app/data
+      - yolo_models:/root/.cache
+    environment:
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - TF_FORCE_GPU_ALLOW_GROWTH=true
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DEBUG=0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/docs/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  yolo_models:
